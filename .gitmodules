@@ -1,0 +1,4 @@
+[submodule "stellar-protocol"]
+	path = stellar-protocol
+	url = https://github.com/stellar/stellar-protocol.git
+	branch = contract-verification-registry

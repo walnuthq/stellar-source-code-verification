@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: api-verifier-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: verifier
+      POSTGRES_PASSWORD: verifier
+      POSTGRES_DB: verifier
+    ports:
+      - "5434:5432"
+    volumes:
+      - verifier_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verifier -d verifier"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  verifier_pgdata:
