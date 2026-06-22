@@ -1,11 +1,11 @@
 import "dotenv/config";
+import { rpc } from "@stellar/stellar-sdk";
 import express, {
   type Express,
   type NextFunction,
   type Request,
   type Response,
 } from "express";
-import { rpc } from "@stellar/stellar-sdk";
 import { wasmsRouter } from "./routes/wasms.js";
 
 export const app: Express = express();

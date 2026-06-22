@@ -99,6 +99,9 @@ async function enqueue(wasmHash: string) {
         .returning();
     }
 
-    return { body: serializeStatusObject(wasmRow, rows), isNew: Boolean(inserted) };
+    return {
+      body: serializeStatusObject(wasmRow, rows),
+      isNew: Boolean(inserted),
+    };
   });
 }

@@ -27,7 +27,8 @@ function serializeVerification(row: VerificationRow): SourceCodeVerification {
 
   if (row.outOfBand) entry.out_of_band = true;
   if (row.bldimg) entry.bldimg = row.bldimg;
-  if (nonEmpty(row.bldopt)) entry.bldopt = row.bldopt!;
+  const bldopt = nonEmpty(row.bldopt);
+  if (bldopt) entry.bldopt = bldopt;
   if (row.sourceRepo) entry.source_repo = row.sourceRepo;
   if (row.sourceRev) entry.source_rev = row.sourceRev;
   if (row.tarballUrl) entry.tarball_url = row.tarballUrl;
@@ -40,7 +41,8 @@ function serializeVerification(row: VerificationRow): SourceCodeVerification {
   if (row.status !== "unverified" && row.processedAt) {
     entry.processed_at = toRfc3339(row.processedAt);
   }
-  if (nonEmpty(row.resultsUrls)) entry.results_urls = row.resultsUrls!;
+  const resultsUrls = nonEmpty(row.resultsUrls);
+  if (resultsUrls) entry.results_urls = resultsUrls;
 
   return entry;
 }

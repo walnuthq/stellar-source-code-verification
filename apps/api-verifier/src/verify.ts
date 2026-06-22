@@ -1,11 +1,7 @@
 import { spawn } from "node:child_process";
 import { and, eq } from "drizzle-orm";
 import { db } from "./db/client.js";
-import {
-  type NewVerificationRow,
-  verifications,
-  wasms,
-} from "./db/schema.js";
+import { type NewVerificationRow, verifications, wasms } from "./db/schema.js";
 import type { VerificationStatus } from "./lib/responses.js";
 
 /**
@@ -48,7 +44,8 @@ function runVerifyCommand(wasmHash: string): Promise<void> {
     child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`stellar contract verify exited with code ${code}`));
+      else
+        reject(new Error(`stellar contract verify exited with code ${code}`));
     });
   });
 }
@@ -65,9 +62,7 @@ export function startVerification(wasmHash: string): void {
   if (inFlight.has(wasmHash)) return;
   inFlight.add(wasmHash);
   processVerification(wasmHash)
-    .catch((err) =>
-      console.error(`Verification crashed for ${wasmHash}:`, err),
-    )
+    .catch((err) => console.error(`Verification crashed for ${wasmHash}:`, err))
     .finally(() => inFlight.delete(wasmHash));
 }
 

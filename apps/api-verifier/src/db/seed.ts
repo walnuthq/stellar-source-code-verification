@@ -1,10 +1,6 @@
 import { inArray } from "drizzle-orm";
 import { db, pool } from "./client.js";
-import {
-  type NewVerificationRow,
-  verifications,
-  wasms,
-} from "./schema.js";
+import { type NewVerificationRow, verifications, wasms } from "./schema.js";
 
 /** A 64-hex demo wasm hash built by repeating a byte, e.g. "11".repeat(32). */
 const hash = (byte: string) => byte.repeat(32);
@@ -135,7 +131,10 @@ async function seed() {
       });
       if (entry.verifications.length > 0) {
         await tx.insert(verifications).values(
-          entry.verifications.map((v) => ({ ...v, wasmHash: entry.wasmHash })),
+          entry.verifications.map((v) => ({
+            ...v,
+            wasmHash: entry.wasmHash,
+          })),
         );
       }
     }

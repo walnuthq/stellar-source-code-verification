@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# Flat, npm/yarn-style node_modules so transitive deps resolve from a single
+# top-level layout (mirrors walnuthq/miden-source-code-verification).
+nodeLinker: hoisted
+allowBuilds:
+  "@scarf/scarf": false
+  esbuild: true
