@@ -17,5 +17,67 @@ services:
       timeout: 5s
       retries: 5
 
+  # One-shot: apply the Drizzle schema to Postgres before the API starts. The
+  # runtime image is serve-only (no drizzle-kit), so we reuse the node-builder
+  # stage, which already has the dev tooling and source, and run `db:push`.
+  api-verifier-migrate:
+    build:
+      context: .
+      dockerfile: apps/api-verifier/Dockerfile
+      target: node-builder
+    working_dir: /repo/apps/api-verifier
+    # Invoke drizzle-kit directly (hoisted bin) rather than via `pnpm db:push`,
+    # which would trigger pnpm's pre-run deps check and abort without a TTY.
+    command: ["/repo/node_modules/.bin/drizzle-kit", "push", "--force"]
+    environment:
+      DATABASE_URL: postgres://verifier:verifier@postgres:5432/verifier
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api-verifier:
+    build:
+      context: .
+      dockerfile: apps/api-verifier/Dockerfile
+    container_name: api-verifier
+    # Required to run the rootless Docker-in-Docker daemon that
+    # `stellar contract verify` shells out to.
+    privileged: true
+    ports:
+      # Host port defaults to 8080; override with API_VERIFIER_PORT if it's taken.
+      - "${API_VERIFIER_PORT:-8080}:8080"
+    environment:
+      # PORT defaults to 8080 in the image; the daemon wiring (DOCKER_HOST /
+      # DOCKER_TLS_CERTDIR) is baked in too. Postgres is reached over the compose
+      # network on its internal port 5432.
+      DATABASE_URL: postgres://verifier:verifier@postgres:5432/verifier
+      VERIFIER_NAME: "Example Verification Service"
+      VERIFIER_URL: "https://verify.example.com"
+      # STELLAR_RPC_URL defaults to mainnet (see src/app.ts); override here if needed.
+    volumes:
+      # Persist the inner daemon's image/layer store so verify runs don't re-pull
+      # build images on every restart.
+      - verifier_dind:/home/rootless/.local/share/docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api-verifier-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # TCP check: the server is listening (independent of upstream RPC).
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('net').connect(8080,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
 volumes:
   verifier_pgdata:
+  verifier_dind:
