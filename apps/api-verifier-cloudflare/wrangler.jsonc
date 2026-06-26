@@ -36,12 +36,12 @@
         "enabled": true,
       },
       /* add SSH public key when debugging with wrangler tail */
-      /* "authorized_keys": [
+      "authorized_keys": [
         {
-          "name": "id_ed25519",
-          "public_key": "ssh-ed25519 PUBLIC_KEY EMAIL_ADDRESS",
+          "name": "cf-debug",
+          "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK/3oY1Kcj9Mb/MYOtxc77mLeJkgXYX6rfSwMqXUnkv1 cf-debug",
         },
-      ], */
+      ],
     },
   ],
   "durable_objects": {
