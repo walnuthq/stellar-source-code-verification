@@ -3,27 +3,30 @@
 #
 # `stellar contract verify` rebuilds wasm inside Docker, so the daemon must be
 # running before we accept a verify request. The upstream dind-rootless entrypoint
-# runs dockerd under rootlesskit; with DOCKER_TLS_CERTDIR empty it listens on
-# tcp://0.0.0.0:2375, which DOCKER_HOST points at for both our `docker info` check
-# and the `stellar`->`docker` calls. RootlessKit runs in host-network mode (see
-# DOCKERD_ROOTLESS_ROOTLESSKIT_NET in the Dockerfile), so dockerd shares this
-# container's network namespace — 2375 is reachable directly, no port-forward.
+# runs dockerd under rootlesskit (slirp4netns); with DOCKER_TLS_CERTDIR empty it
+# listens on tcp://0.0.0.0:2375, which DOCKER_HOST points at for both our `docker
+# info` check and the `stellar`->`docker` calls.
 #
 # `--iptables=false --ip6tables=false` are required to run under Cloudflare
 # Containers, which don't allow iptables manipulation
-# (https://developers.cloudflare.com/sandbox/guides/docker-in-docker/). Passing
-# the flags as the first args (they start with `-`) keeps the upstream script's
-# default setup and just appends them to the dockerd command. With iptables off
-# the default bridge has no NAT, so the rebuild container runs with host
-# networking instead (see stellar-cli's `run_in_container`).
+# (https://developers.cloudflare.com/sandbox/guides/docker-in-docker/). With
+# iptables off the default bridge has no NAT, so the rebuild container runs with
+# host networking instead (see stellar-cli's `run_in_container`).
 #
-# IMPORTANT: rootless dockerd takes far longer to boot than the ~20s that
-# Cloudflare Containers (@cloudflare/containers) waits for the container to start
-# listening on $PORT. So we DON'T block the HTTP server on the daemon: node binds
-# $PORT immediately, and the daemon is awaited in the background. Until it's ready,
-# /verify returns 503 (it checks $DOCKER_READY_FILE, written below). This keeps the
-# container's port health-check fast while Docker finishes booting.
+# rootless networking REQUIRES slirp4netns (host-net mode lets dockerd start but
+# can't create a container network sandbox), and slirp4netns opens /dev/net/tun as
+# uid 1000. Cloudflare exposes /dev/net/tun only to root, so we start as root just
+# long enough to widen its permissions, then drop to the rootless user (below).
 set -eu
+
+# --- Stage 0 (root): make /dev/net/tun usable by the rootless user, then drop. ---
+if [ "$(id -u)" = 0 ]; then
+  mkdir -p /dev/net
+  [ -e /dev/net/tun ] || mknod /dev/net/tun c 10 200 2>/dev/null || true
+  chmod 0666 /dev/net/tun 2>/dev/null || true
+  export HOME=/home/rootless
+  exec su-exec rootless:rootless "$0" "$@"
+fi
 
 DOCKER_READY_FILE="${DOCKER_READY_FILE:-/tmp/docker-ready}"
 DOCKERD_LOG="${DOCKERD_LOG:-/tmp/dockerd.log}"
@@ -31,8 +34,8 @@ rm -f "$DOCKER_READY_FILE"
 
 # Start dockerd in the background via the image's own entrypoint. Capture its
 # stdout/stderr so the /debug HTTP route can surface why the daemon failed to come
-# up (rootless dind under Cloudflare Containers may hit userns/cgroup/iptables
-# limits that only show in these logs).
+# up (rootless dind under Cloudflare Containers may hit userns/cgroup/tun limits
+# that only show in these logs).
 dockerd-entrypoint.sh --iptables=false --ip6tables=false >"$DOCKERD_LOG" 2>&1 &
 
 # Await the daemon in the background and mark readiness via $DOCKER_READY_FILE.

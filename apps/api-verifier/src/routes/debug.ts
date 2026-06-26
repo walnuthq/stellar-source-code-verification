@@ -42,6 +42,7 @@ router.get("/debug", async (_req, res) => {
     idmapTools,
     subid,
     cgroup,
+    tun,
     dmesg,
   ] = await Promise.all([
     sh("docker info 2>&1; echo '--- DOCKER_HOST='\"$DOCKER_HOST\""),
@@ -60,6 +61,15 @@ router.get("/debug", async (_req, res) => {
       "cat /sys/fs/cgroup/cgroup.controllers 2>&1; " +
         "stat -fc '%T' /sys/fs/cgroup 2>&1; ls /sys/fs/cgroup 2>&1 | head",
     ),
+    // Can the rootless user actually open /dev/net/tun (what slirp4netns needs)?
+    // After the entrypoint's root-stage chmod, this distinguishes a DAC-permission
+    // block (now openable) from a device-cgroup block (still EPERM).
+    sh(
+      "ls -l /dev/net/tun 2>&1; " +
+        "(exec 9<>/dev/net/tun) 2>&1 && echo TUN_OPENABLE || echo TUN_EPERM; " +
+        "grep -E 'Cap(Eff|Bnd)' /proc/self/status 2>&1; " +
+        "cat /sys/fs/cgroup/devices.allow 2>&1 | head -5",
+    ),
     sh("dmesg 2>&1 | tail -30"),
   ]);
 
@@ -72,6 +82,7 @@ router.get("/debug", async (_req, res) => {
     idmapTools,
     subid,
     cgroup,
+    tun,
     dmesg,
   });
 });

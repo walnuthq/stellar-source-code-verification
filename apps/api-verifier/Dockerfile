@@ -91,12 +91,13 @@ RUN cp -r apps/api-verifier/dist /opt/prod/dist
 FROM docker:dind-rootless
 
 USER root
-# Runtime libs the dynamically-linked `stellar` binary and the node binary need,
-# plus shadow-uidmap, which provides newuidmap/newgidmap (installed setuid-root)
-# that rootless dockerd uses to set up its user namespace.
+# Runtime libs the dynamically-linked `stellar` binary and the node binary need;
+# shadow-uidmap provides newuidmap/newgidmap (installed setuid-root) that rootless
+# dockerd uses to set up its user namespace; su-exec drops the entrypoint from root
+# (needed to widen /dev/net/tun) to the rootless user.
 RUN apk add --no-cache \
     libstdc++ openssl dbus-libs eudev-libs ca-certificates \
-    shadow-uidmap
+    shadow-uidmap su-exec
 
 # Node 24 runtime (binary only; relies on libstdc++ installed above).
 COPY --from=node:24-alpine /usr/local/bin/node /usr/local/bin/node
@@ -133,24 +134,19 @@ RUN mkdir -p /home/rootless/.xdg-runtime \
 
 # PORT is read by src/server.ts; DOCKER_HOST/DOCKER_TLS_CERTDIR wire the stellar &
 # docker CLIs to the in-container rootless daemon over TCP; XDG_RUNTIME_DIR
-# relocates rootless dockerd's runtime dir (see above).
-#
-# DOCKERD_ROOTLESS_ROOTLESSKIT_NET=host runs RootlessKit in host-network mode: its
-# default (slirp4netns) gives the daemon an isolated netns by creating a tap
-# device, which fails under Cloudflare Containers ("setting up tap tap0: ... open:
-# Permission denied" — no access to /dev/net/tun). We don't need daemon network
-# isolation: the `stellar contract verify` rebuild runs with `--network host` and
-# we reach the daemon at 127.0.0.1:2375 in the same namespace. PORT_DRIVER=none
-# then disables the (now-meaningless) rootless port-forwarder.
+# relocates rootless dockerd's runtime dir (see above). RootlessKit stays in its
+# default slirp4netns mode — host-net mode lets dockerd start but can't create a
+# container network sandbox, so the verify rebuild can't run.
 ENV PORT=8080 \
     DOCKER_HOST=tcp://127.0.0.1:2375 \
     DOCKER_TLS_CERTDIR="" \
-    XDG_RUNTIME_DIR=/home/rootless/.xdg-runtime \
-    DOCKERD_ROOTLESS_ROOTLESSKIT_NET=host \
-    DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=none
+    XDG_RUNTIME_DIR=/home/rootless/.xdg-runtime
 
 WORKDIR /home/rootless/app
 EXPOSE 8080
 
-USER rootless
+# Start as root: the entrypoint widens /dev/net/tun permissions (Cloudflare exposes
+# it root-only, but rootless slirp4netns must open it as uid 1000) and then drops
+# to the rootless user via setpriv. See docker-entrypoint.sh.
+USER root
 ENTRYPOINT ["app-entrypoint.sh"]
