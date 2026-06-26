@@ -132,12 +132,22 @@ RUN mkdir -p /home/rootless/.xdg-runtime \
     && chmod 700 /home/rootless/.xdg-runtime
 
 # PORT is read by src/server.ts; DOCKER_HOST/DOCKER_TLS_CERTDIR wire the stellar &
-# docker CLIs to the in-container rootless daemon over its forwarded TCP port;
-# XDG_RUNTIME_DIR relocates rootless dockerd's runtime dir (see above).
+# docker CLIs to the in-container rootless daemon over TCP; XDG_RUNTIME_DIR
+# relocates rootless dockerd's runtime dir (see above).
+#
+# DOCKERD_ROOTLESS_ROOTLESSKIT_NET=host runs RootlessKit in host-network mode: its
+# default (slirp4netns) gives the daemon an isolated netns by creating a tap
+# device, which fails under Cloudflare Containers ("setting up tap tap0: ... open:
+# Permission denied" — no access to /dev/net/tun). We don't need daemon network
+# isolation: the `stellar contract verify` rebuild runs with `--network host` and
+# we reach the daemon at 127.0.0.1:2375 in the same namespace. PORT_DRIVER=none
+# then disables the (now-meaningless) rootless port-forwarder.
 ENV PORT=8080 \
     DOCKER_HOST=tcp://127.0.0.1:2375 \
     DOCKER_TLS_CERTDIR="" \
-    XDG_RUNTIME_DIR=/home/rootless/.xdg-runtime
+    XDG_RUNTIME_DIR=/home/rootless/.xdg-runtime \
+    DOCKERD_ROOTLESS_ROOTLESSKIT_NET=host \
+    DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=none
 
 WORKDIR /home/rootless/app
 EXPOSE 8080

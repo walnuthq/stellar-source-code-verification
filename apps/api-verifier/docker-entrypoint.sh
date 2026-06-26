@@ -3,19 +3,19 @@
 #
 # `stellar contract verify` rebuilds wasm inside Docker, so the daemon must be
 # running before we accept a verify request. The upstream dind-rootless entrypoint
-# runs dockerd under rootlesskit (its unix socket is hidden inside that namespace),
-# but because DOCKER_TLS_CERTDIR is empty it also listens on tcp://0.0.0.0:2375 and
-# forwards the port to this (parent) namespace — which is what DOCKER_HOST points
-# at, for both our `docker info` check and the `stellar`->`docker` calls.
+# runs dockerd under rootlesskit; with DOCKER_TLS_CERTDIR empty it listens on
+# tcp://0.0.0.0:2375, which DOCKER_HOST points at for both our `docker info` check
+# and the `stellar`->`docker` calls. RootlessKit runs in host-network mode (see
+# DOCKERD_ROOTLESS_ROOTLESSKIT_NET in the Dockerfile), so dockerd shares this
+# container's network namespace — 2375 is reachable directly, no port-forward.
 #
 # `--iptables=false --ip6tables=false` are required to run under Cloudflare
 # Containers, which don't allow iptables manipulation
 # (https://developers.cloudflare.com/sandbox/guides/docker-in-docker/). Passing
 # the flags as the first args (they start with `-`) keeps the upstream script's
-# default setup — the unix + tcp://0.0.0.0:2375 hosts and the 2375 port-forward —
-# and just appends them to the dockerd command. With iptables off the default
-# bridge has no NAT, so the rebuild container runs with host networking instead
-# (see stellar-cli's `run_in_container`).
+# default setup and just appends them to the dockerd command. With iptables off
+# the default bridge has no NAT, so the rebuild container runs with host
+# networking instead (see stellar-cli's `run_in_container`).
 #
 # IMPORTANT: rootless dockerd takes far longer to boot than the ~20s that
 # Cloudflare Containers (@cloudflare/containers) waits for the container to start
