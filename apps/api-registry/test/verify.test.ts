@@ -1,9 +1,13 @@
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { app } from "../src/app.js";
-import { db, pool } from "../src/db/client.js";
+import { createApp } from "../src/app.js";
+import db from "../src/db/index.js";
 import { wasms } from "../src/db/schema.js";
+
+// In-process registry app. Settling to "verified" requires a running api-verify
+// (the registry fetches API_VERIFY_URL/verify) plus a reproducible build.
+const app = createApp();
 
 // A real, reproducible wasm whose source/build metadata rebuilds to this hash.
 const WASM_HASH =
@@ -23,7 +27,7 @@ describe("real verification flow", () => {
   });
 
   afterAll(async () => {
-    await pool.end();
+    await db.$client.end();
   });
 
   it(

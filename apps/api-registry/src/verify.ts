@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process";
 import { and, eq } from "drizzle-orm";
-import { db } from "./db/client.js";
+import db from "./db/index.js";
 import { type NewVerificationRow, verifications, wasms } from "./db/schema.js";
+import { API_VERIFY_URL, VERIFIER_NAME, VERIFIER_URL } from "./lib/constants.js";
 import type { VerificationStatus } from "./lib/responses.js";
 
 /**
@@ -10,8 +10,8 @@ import type { VerificationStatus } from "./lib/responses.js";
  */
 export function ownVerifier(): { name: string; url?: string } {
   return {
-    name: process.env.VERIFIER_NAME ?? "Example Verification Service",
-    url: process.env.VERIFIER_URL ?? undefined,
+    name: VERIFIER_NAME,
+    url: VERIFIER_URL ?? undefined,
   };
 }
 
@@ -26,36 +26,31 @@ export function pendingEntry(wasmHash: string): NewVerificationRow {
   };
 }
 
-/** Binary used to run the reproducible-build check (override for tests/CI). */
-const STELLAR_BIN = process.env.STELLAR_BIN ?? "stellar";
-
 /**
- * Run `stellar contract verify --wasm-hash <hash> --trust`, which rebuilds the
- * wasm from its recorded SEP-58 build metadata (in Docker) and compares hashes.
- * Resolves on exit code 0 (reproduced), rejects otherwise. Can take minutes.
+ * Ask the compute service (apps/api-verify) to run the reproducible build for a
+ * wasm and report whether it reproduced. Rejects when the service is
+ * unreachable or errors; resolves with the `verified` boolean otherwise. Can
+ * take minutes (the build runs in Docker on the other side).
  */
-function runVerifyCommand(wasmHash: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      STELLAR_BIN,
-      ["contract", "verify", "--wasm-hash", wasmHash, "--trust"],
-      { stdio: "inherit" },
-    );
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) resolve();
-      else
-        reject(new Error(`stellar contract verify exited with code ${code}`));
-    });
+async function callVerifyService(wasmHash: string): Promise<boolean> {
+  const res = await fetch(`${API_VERIFY_URL}/verify`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ wasmHash }),
   });
+  if (!res.ok) {
+    throw new Error(`api-verify responded ${res.status}`);
+  }
+  const { verified } = (await res.json()) as { verified: boolean };
+  return verified;
 }
 
 /** Hashes currently being verified in this process, to avoid double-spawning. */
 const inFlight = new Set<string>();
 
 /**
- * Fire-and-forget: settle the verification for a freshly enqueued wasm. Runs the
- * reproducible build, then writes the result back so the next poll returns the
+ * Fire-and-forget: settle the verification for a freshly enqueued wasm. Calls
+ * the compute service, then writes the result back so the next poll returns the
  * settled status (200). Safe to call repeatedly; only one run happens per hash.
  */
 export function startVerification(wasmHash: string): void {
@@ -74,8 +69,8 @@ export function startVerification(wasmHash: string): void {
 export async function processVerification(wasmHash: string): Promise<void> {
   let status: VerificationStatus;
   try {
-    await runVerifyCommand(wasmHash);
-    status = "verified";
+    const verified = await callVerifyService(wasmHash);
+    status = verified ? "verified" : "unverified";
   } catch (err) {
     console.error(`Verification failed for ${wasmHash}:`, err);
     status = "unverified";

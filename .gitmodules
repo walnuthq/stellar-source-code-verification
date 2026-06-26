@@ -2,3 +2,7 @@
 	path = stellar-protocol
 	url = https://github.com/stellar/stellar-protocol.git
 	branch = contract-verification-registry
+[submodule "stellar-cli"]
+	path = stellar-cli
+	url = https://github.com/stellar/stellar-cli.git
+	branch = contract-verify

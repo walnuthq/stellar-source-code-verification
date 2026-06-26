@@ -1,6 +1,6 @@
 import { inArray } from "drizzle-orm";
-import { db, pool } from "./client.js";
 import { type NewVerificationRow, verifications, wasms } from "./schema.js";
+import db from "./index.js";
 
 /** A 64-hex demo wasm hash built by repeating a byte, e.g. "11".repeat(32). */
 const hash = (byte: string) => byte.repeat(32);
@@ -151,4 +151,4 @@ seed()
     console.error("Seed failed:", err);
     process.exitCode = 1;
   })
-  .finally(() => pool.end());
+  .finally(() => db.$client.end());

@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import express, { type Request, type Response, type Router } from "express";
-import { db } from "../db/client.js";
+import db from "../db/index.js";
 import { verifications, wasms } from "../db/schema.js";
 import { INVALID_WASM_HASH } from "../lib/responses.js";
 import { serializeStatusObject } from "../lib/serialize.js";
