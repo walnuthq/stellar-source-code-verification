@@ -15,7 +15,7 @@
     "PORT": "8081",
     // Compute service the registry calls to run `stellar contract verify`.
     // Placeholder — replace with the deployed api-verifier Worker URL.
-    "API_VERIFIER_URL": "https://stellar-source-code-verification-api-verifier.walnuthq.workers.dev",
+    "API_VERIFIER_URL": "https://stellar-source-code-verification-api-verifier.walnut.dev",
   },
   // Edge connection pooler in front of the origin Postgres. The origin
   // connection string is configured on the Hyperdrive resource itself

@@ -91,8 +91,12 @@ RUN cp -r apps/api-verifier/dist /opt/prod/dist
 FROM docker:dind-rootless
 
 USER root
-# Runtime libs the dynamically-linked `stellar` binary and the node binary need.
-RUN apk add --no-cache libstdc++ openssl dbus-libs eudev-libs ca-certificates
+# Runtime libs the dynamically-linked `stellar` binary and the node binary need,
+# plus shadow-uidmap, which provides newuidmap/newgidmap (installed setuid-root)
+# that rootless dockerd uses to set up its user namespace.
+RUN apk add --no-cache \
+    libstdc++ openssl dbus-libs eudev-libs ca-certificates \
+    shadow-uidmap
 
 # Node 24 runtime (binary only; relies on libstdc++ installed above).
 COPY --from=node:24-alpine /usr/local/bin/node /usr/local/bin/node
@@ -113,11 +117,27 @@ RUN chmod +x /usr/local/bin/app-entrypoint.sh
 RUN mkdir -p /home/rootless/.local/share/stellar-cli/tmp \
     && chown -R rootless:rootless /home/rootless/.local/share/stellar-cli
 
+# Rootless dockerd maps subuids/subgids via newuidmap/newgidmap, which must be
+# setuid-root because Cloudflare Containers don't grant CAP_SETUID to the process.
+# The dind-rootless base ships them without the bit set, so set it explicitly.
+RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
+
+# Rootless dockerd requires a writable XDG_RUNTIME_DIR (mode 0700). It defaults to
+# /run/user/<uid>, but Cloudflare's firecracker rootfs neither provides nor lets
+# uid 1000 create /run/user/, so the upstream entrypoint aborts with "need
+# writable HOME and XDG_RUNTIME_DIR". Point it at the rootless user's (writable)
+# HOME and pre-create it.
+RUN mkdir -p /home/rootless/.xdg-runtime \
+    && chown rootless:rootless /home/rootless/.xdg-runtime \
+    && chmod 700 /home/rootless/.xdg-runtime
+
 # PORT is read by src/server.ts; DOCKER_HOST/DOCKER_TLS_CERTDIR wire the stellar &
-# docker CLIs to the in-container rootless daemon over its forwarded TCP port.
+# docker CLIs to the in-container rootless daemon over its forwarded TCP port;
+# XDG_RUNTIME_DIR relocates rootless dockerd's runtime dir (see above).
 ENV PORT=8080 \
     DOCKER_HOST=tcp://127.0.0.1:2375 \
-    DOCKER_TLS_CERTDIR=""
+    DOCKER_TLS_CERTDIR="" \
+    XDG_RUNTIME_DIR=/home/rootless/.xdg-runtime
 
 WORKDIR /home/rootless/app
 EXPOSE 8080
