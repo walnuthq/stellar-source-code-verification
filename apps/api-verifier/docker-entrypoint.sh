@@ -26,10 +26,14 @@
 set -eu
 
 DOCKER_READY_FILE="${DOCKER_READY_FILE:-/tmp/docker-ready}"
+DOCKERD_LOG="${DOCKERD_LOG:-/tmp/dockerd.log}"
 rm -f "$DOCKER_READY_FILE"
 
-# Start dockerd in the background via the image's own entrypoint.
-dockerd-entrypoint.sh --iptables=false --ip6tables=false &
+# Start dockerd in the background via the image's own entrypoint. Capture its
+# stdout/stderr so the /debug HTTP route can surface why the daemon failed to come
+# up (rootless dind under Cloudflare Containers may hit userns/cgroup/iptables
+# limits that only show in these logs).
+dockerd-entrypoint.sh --iptables=false --ip6tables=false >"$DOCKERD_LOG" 2>&1 &
 
 # Await the daemon in the background and mark readiness via $DOCKER_READY_FILE.
 # Runs detached so it never delays node's listen() below.
@@ -44,7 +48,7 @@ dockerd-entrypoint.sh --iptables=false --ip6tables=false &
     sleep 1
   done
   echo "error: Docker daemon did not become ready in time" >&2
-) &
+) >>"$DOCKERD_LOG" 2>&1 &
 
 # Start the HTTP server immediately so the container is listening on $PORT well
 # inside Cloudflare's port-readiness window, independent of the Docker boot.

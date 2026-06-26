@@ -7,6 +7,7 @@ import {
   PORT,
   STELLAR_BIN,
 } from "./lib/constants.js";
+import debugRouter from "./routes/debug.js";
 import verifyRouter from "./routes/verify.js";
 
 const app = express();
@@ -32,6 +33,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use(verifyRouter);
+app.use(debugRouter);
 
 app.listen(Number(PORT), () => {
   console.log(`api-verifier listening on http://localhost:${PORT}`);

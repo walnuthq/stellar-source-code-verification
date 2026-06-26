@@ -17,3 +17,6 @@ export const STELLAR_BIN = process.env.STELLAR_BIN ?? "stellar";
  */
 export const DOCKER_READY_FILE =
   process.env.DOCKER_READY_FILE ?? "/tmp/docker-ready";
+
+/** Log file capturing the in-container dockerd boot output (see /debug route). */
+export const DOCKERD_LOG = process.env.DOCKERD_LOG ?? "/tmp/dockerd.log";

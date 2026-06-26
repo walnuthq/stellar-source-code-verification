@@ -35,4 +35,9 @@ app.post("/verify", (c) => {
   return container.fetch(c.req.raw);
 });
 
+app.get("/debug", (c) => {
+  const container = getContainer(c.env.VERIFIER);
+  return container.fetch(c.req.raw);
+});
+
 export default app;
