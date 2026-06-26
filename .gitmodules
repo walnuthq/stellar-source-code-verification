@@ -4,5 +4,5 @@
 	branch = contract-verification-registry
 [submodule "stellar-cli"]
 	path = stellar-cli
-	url = https://github.com/stellar/stellar-cli.git
+	url = https://github.com/walnuthq/stellar-cli.git
 	branch = contract-verify
