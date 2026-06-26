@@ -1,0 +1,63 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "stellar-source-code-verification-api-registry",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "PORT": "8081",
+    // Compute service the registry calls to run `stellar contract verify`.
+    // Placeholder — replace with the deployed api-verifier Worker URL.
+    "API_VERIFIER_URL": "https://stellar-source-code-verification-api-verifier.walnuthq.workers.dev",
+  },
+  // Edge connection pooler in front of the origin Postgres. The origin
+  // connection string is configured on the Hyperdrive resource itself
+  // (`wrangler hyperdrive create`), not here. `localConnectionString` is used by
+  // `wrangler dev` to reach a local database.
+  //
+  // NOTE: query caching MUST stay disabled on this resource. This is a
+  // read-after-write registry (GET /wasms/:hash.json enqueues on first sight then
+  // polls), and Hyperdrive's default SELECT cache (max_age 60s) serves stale empty
+  // reads that break that invariant. Disable it with:
+  //   wrangler hyperdrive update a9d6d24805ba45239817ddbb348f4fd8 \
+  //     --origin-password '<DB_PASSWORD>' --caching-disabled true
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "a9d6d24805ba45239817ddbb348f4fd8",
+      "localConnectionString": "postgres://verifier:verifier@localhost:5434/verifier",
+    },
+  ],
+  // Durable verification trigger. On first sight of a wasm the registry sends a
+  // message here and returns 202; the consumer below awaits the (minutes-long)
+  // reproducible build and persists the result. Queue consumers have no
+  // wall-clock limit, unlike a post-response `ctx.waitUntil`. Create the queues
+  // before first deploy:
+  //   wrangler queues create stellar-source-code-verification-verify
+  //   wrangler queues create stellar-source-code-verification-verify-dlq
+  "queues": {
+    "producers": [
+      {
+        "binding": "VERIFY_QUEUE",
+        "queue": "stellar-source-code-verification-verify",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "stellar-source-code-verification-verify",
+        // api-verifier is a single instance and runs one build at a time.
+        "max_batch_size": 1,
+        "max_concurrency": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "stellar-source-code-verification-verify-dlq",
+      },
+    ],
+  },
+}

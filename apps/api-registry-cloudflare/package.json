@@ -1,0 +1,22 @@
+{
+  "name": "api-registry-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "pnpm --filter api-registry build && tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "cf:typegen": "wrangler types",
+    "cf:dev": "pnpm --filter api-registry build && wrangler dev --port 8081",
+    "cf:deploy": "pnpm --filter api-registry build && wrangler deploy"
+  },
+  "dependencies": {
+    "api-registry": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "6.0.3",
+    "wrangler": "4.101.0"
+  }
+}

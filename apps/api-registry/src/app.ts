@@ -7,7 +7,8 @@ import express, {
 } from "express";
 import { type Database, dbScope } from "./db/index.js";
 import { STELLAR_RPC_URL } from "./lib/constants.js";
-import { wasmsRouter } from "./routes/wasms.js";
+import { createWasmsRouter, type TriggerVerification } from "./routes/wasms.js";
+import { startVerification } from "./verify.js";
 
 type CreateAppOptions = {
   /**
@@ -18,10 +19,19 @@ type CreateAppOptions = {
    * shared singleton.
    */
   requestDbFactory?: () => Database;
+
+  /**
+   * How a first-seen wasm's verification is kicked off. Defaults to the
+   * in-process background runner (`startVerification`); the Cloudflare Worker
+   * supplies a durable queue `send` instead, since it can't keep background work
+   * alive past the response.
+   */
+  triggerVerification?: TriggerVerification;
 };
 
 export const createApp = ({
   requestDbFactory,
+  triggerVerification = startVerification,
 }: CreateAppOptions = {}): Express => {
   const app = express();
 
@@ -60,7 +70,7 @@ export const createApp = ({
   });
 
   // Contract Verification Registry API: GET /wasms/:wasm_hash.json
-  app.use(wasmsRouter);
+  app.use(createWasmsRouter(triggerVerification));
 
   return app;
 };

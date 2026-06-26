@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { Router } from "express";
-import { STELLAR_BIN } from "../lib/constants.js";
+import { DOCKER_READY_FILE, STELLAR_BIN } from "../lib/constants.js";
 
 const router = Router();
 
@@ -32,12 +33,23 @@ type VerifyRequestBody = { wasmHash?: string };
  *   - exit 0 (reproduced)        -> 200 { verified: true }
  *   - non-zero exit (mismatch)   -> 200 { verified: false }
  *   - could not spawn the binary -> 500 { error }
+ *   - Docker daemon not ready yet -> 503 { error } (retry shortly)
  */
 router.post("/verify", async (req, res) => {
   const { wasmHash } = req.body as VerifyRequestBody;
 
   if (!wasmHash || !WASM_HASH_RE.test(wasmHash)) {
     res.status(400).json({ error: "wasmHash must be a lowercase hex SHA-256" });
+    return;
+  }
+
+  // The server listens before the in-container Docker daemon finishes booting
+  // (see docker-entrypoint.sh); `stellar contract verify` needs Docker, so reject
+  // early with a retryable 503 until the entrypoint signals readiness.
+  if (!existsSync(DOCKER_READY_FILE)) {
+    res
+      .status(503)
+      .json({ error: "Docker daemon is still starting; retry shortly" });
     return;
   }
 

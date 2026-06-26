@@ -2,9 +2,9 @@
 # Boot the rootless Docker daemon, then serve the Express app.
 #
 # `stellar contract verify` rebuilds wasm inside Docker, so the daemon must be
-# running before we start the server. The upstream dind-rootless entrypoint runs
-# dockerd under rootlesskit (its unix socket is hidden inside that namespace), but
-# because DOCKER_TLS_CERTDIR is empty it also listens on tcp://0.0.0.0:2375 and
+# running before we accept a verify request. The upstream dind-rootless entrypoint
+# runs dockerd under rootlesskit (its unix socket is hidden inside that namespace),
+# but because DOCKER_TLS_CERTDIR is empty it also listens on tcp://0.0.0.0:2375 and
 # forwards the port to this (parent) namespace — which is what DOCKER_HOST points
 # at, for both our `docker info` check and the `stellar`->`docker` calls.
 #
@@ -16,23 +16,36 @@
 # and just appends them to the dockerd command. With iptables off the default
 # bridge has no NAT, so the rebuild container runs with host networking instead
 # (see stellar-cli's `run_in_container`).
+#
+# IMPORTANT: rootless dockerd takes far longer to boot than the ~20s that
+# Cloudflare Containers (@cloudflare/containers) waits for the container to start
+# listening on $PORT. So we DON'T block the HTTP server on the daemon: node binds
+# $PORT immediately, and the daemon is awaited in the background. Until it's ready,
+# /verify returns 503 (it checks $DOCKER_READY_FILE, written below). This keeps the
+# container's port health-check fast while Docker finishes booting.
 set -eu
+
+DOCKER_READY_FILE="${DOCKER_READY_FILE:-/tmp/docker-ready}"
+rm -f "$DOCKER_READY_FILE"
 
 # Start dockerd in the background via the image's own entrypoint.
 dockerd-entrypoint.sh --iptables=false --ip6tables=false &
 
-echo "Waiting for Docker daemon..."
-for _ in $(seq 1 60); do
-  if docker info >/dev/null 2>&1; then
-    echo "Docker is up."
-    break
-  fi
-  sleep 1
-done
-
-if ! docker info >/dev/null 2>&1; then
+# Await the daemon in the background and mark readiness via $DOCKER_READY_FILE.
+# Runs detached so it never delays node's listen() below.
+(
+  echo "Waiting for Docker daemon..."
+  for _ in $(seq 1 180); do
+    if docker info >/dev/null 2>&1; then
+      echo "Docker is up."
+      touch "$DOCKER_READY_FILE"
+      exit 0
+    fi
+    sleep 1
+  done
   echo "error: Docker daemon did not become ready in time" >&2
-  exit 1
-fi
+) &
 
+# Start the HTTP server immediately so the container is listening on $PORT well
+# inside Cloudflare's port-readiness window, independent of the Docker boot.
 exec node dist/server.js

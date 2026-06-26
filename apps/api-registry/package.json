@@ -11,6 +11,10 @@
     "./db": {
       "types": "./dist/db/index.d.ts",
       "default": "./dist/db/index.js"
+    },
+    "./verify": {
+      "types": "./dist/verify.d.ts",
+      "default": "./dist/verify.js"
     }
   },
   "scripts": {

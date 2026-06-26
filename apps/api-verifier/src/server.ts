@@ -1,6 +1,12 @@
+import { existsSync } from "node:fs";
 import cors from "cors";
 import express from "express";
-import { ALLOWED_ORIGINS, PORT, STELLAR_BIN } from "./lib/constants.js";
+import {
+  ALLOWED_ORIGINS,
+  DOCKER_READY_FILE,
+  PORT,
+  STELLAR_BIN,
+} from "./lib/constants.js";
 import verifyRouter from "./routes/verify.js";
 
 const app = express();
@@ -20,6 +26,7 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => {
   res.json({
     timestamp: Date.now(),
+    dockerReady: existsSync(DOCKER_READY_FILE),
     env: { PORT, ALLOWED_ORIGINS, STELLAR_BIN },
   });
 });
