@@ -19,24 +19,24 @@ services:
 
   # Compute service: runs `stellar contract verify` inside rootless
   # Docker-in-Docker. Stateless (no DB) — the api-registry service calls it over
-  # HTTP on the compose network (http://api-verify:8080).
-  api-verify:
+  # HTTP on the compose network (http://api-verifier:8080).
+  api-verifier:
     build:
       context: .
-      dockerfile: apps/api-verify/Dockerfile
-    container_name: api-verify
+      dockerfile: apps/api-verifier/Dockerfile
+    container_name: api-verifier
     # Required to run the rootless Docker-in-Docker daemon that
     # `stellar contract verify` shells out to.
     privileged: true
     ports:
-      # Host port defaults to 8080; override with API_VERIFY_PORT if it's taken.
-      - "${API_VERIFY_PORT:-8080}:8080"
+      # Host port defaults to 8080; override with API_VERIFIER_PORT if it's taken.
+      - "${API_VERIFIER_PORT:-8080}:8080"
     # PORT defaults to 8080 in the image; the daemon wiring (DOCKER_HOST /
     # DOCKER_TLS_CERTDIR) is baked in too.
     volumes:
       # Persist the inner daemon's image/layer store so verify runs don't re-pull
       # build images on every restart.
-      - verify_dind:/home/rootless/.local/share/docker
+      - verifier_dind:/home/rootless/.local/share/docker
     healthcheck:
       # TCP check: the server is listening.
       test:
@@ -66,7 +66,7 @@ services:
     restart: "no"
 
   # Registry / SEP API. Serves the wasm verification registry and delegates the
-  # reproducible build to api-verify over the compose network.
+  # reproducible build to api-verifier over the compose network.
   api-registry:
     build:
       context: .
@@ -78,7 +78,7 @@ services:
       - "${API_REGISTRY_PORT:-8081}:8081"
     environment:
       DATABASE_URL: postgres://verifier:verifier@postgres:5432/verifier
-      API_VERIFY_URL: http://api-verify:8080
+      API_VERIFIER_URL: http://api-verifier:8080
       VERIFIER_NAME: "Example Verification Service"
       VERIFIER_URL: "https://verify.example.com"
       # STELLAR_RPC_URL defaults to mainnet (see src/lib/constants.ts).
@@ -103,4 +103,4 @@ services:
 
 volumes:
   verifier_pgdata:
-  verify_dind:
+  verifier_dind:

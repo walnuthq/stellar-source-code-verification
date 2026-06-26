@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Multi-stage image for apps/api-verify.
+# Multi-stage image for apps/api-verifier.
 #
 # The service shells out to `stellar contract verify`, which rebuilds wasm inside
 # Docker, so the running container must itself be able to run Docker. We therefore
@@ -8,7 +8,7 @@
 # add a from-source `stellar` CLI plus a Node 24 runtime.
 #
 # Build from the REPO ROOT (the pnpm lockfile/workspace live there):
-#   docker build -f apps/api-verify/Dockerfile -t api-verify .
+#   docker build -f apps/api-verifier/Dockerfile -t api-verifier .
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the `stellar` CLI from source (musl, so it runs on Alpine).
@@ -70,20 +70,20 @@ WORKDIR /repo
 
 # Manifests first for a cacheable install layer.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
-COPY apps/api-verify/package.json apps/api-verify/package.json
+COPY apps/api-verifier/package.json apps/api-verifier/package.json
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 # Source + build.
-COPY apps/api-verify apps/api-verify
-RUN pnpm --filter api-verify build
+COPY apps/api-verifier apps/api-verifier
+RUN pnpm --filter api-verifier build
 
 # Self-contained production tree (node_modules + package.json) at /opt/prod,
 # then drop the compiled output alongside it.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm --filter api-verify deploy --prod --legacy /opt/prod
-RUN cp -r apps/api-verify/dist /opt/prod/dist
+    pnpm --filter api-verifier deploy --prod --legacy /opt/prod
+RUN cp -r apps/api-verifier/dist /opt/prod/dist
 
 # ---------------------------------------------------------------------------
 # Stage 3: final runtime — rootless Docker-in-Docker + stellar + node + app.
@@ -102,7 +102,7 @@ COPY --from=rust-builder /usr/local/bin/stellar /usr/local/bin/stellar
 
 # Application (owned by the rootless user that dind-rootless runs as).
 COPY --from=node-builder --chown=rootless:rootless /opt/prod /home/rootless/app
-COPY --chown=rootless:rootless apps/api-verify/docker-entrypoint.sh /usr/local/bin/app-entrypoint.sh
+COPY --chown=rootless:rootless apps/api-verifier/docker-entrypoint.sh /usr/local/bin/app-entrypoint.sh
 RUN chmod +x /usr/local/bin/app-entrypoint.sh
 
 # `stellar contract verify` writes its source archive under

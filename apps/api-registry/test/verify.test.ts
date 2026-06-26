@@ -5,8 +5,8 @@ import { createApp } from "../src/app.js";
 import db from "../src/db/index.js";
 import { wasms } from "../src/db/schema.js";
 
-// In-process registry app. Settling to "verified" requires a running api-verify
-// (the registry fetches API_VERIFY_URL/verify) plus a reproducible build.
+// In-process registry app. Settling to "verified" requires a running api-verifier
+// (the registry fetches API_VERIFIER_URL/verify) plus a reproducible build.
 const app = createApp();
 
 // A real, reproducible wasm whose source/build metadata rebuilds to this hash.

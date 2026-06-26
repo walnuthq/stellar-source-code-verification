@@ -1,0 +1,62 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "stellar-source-code-verification-api-verifier",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "PORT": "8080",
+    "ALLOWED_ORIGINS": "*",
+  },
+  "containers": [
+    {
+      "class_name": "Verifier",
+      "image": "../api-verifier/Dockerfile",
+      // api-verifier is a pnpm workspace package whose Dockerfile builds from the
+      // monorepo root (needs the workspace lockfile + the stellar-cli submodule +
+      // apps/api-verifier/* paths), matching docker-compose's `context: .`. Default
+      // context is the Dockerfile's dir, so point it at the repo root instead.
+      "image_build_context": "../../",
+      "max_instances": 1,
+      // The container runs `stellar contract verify` inside rootless
+      // Docker-in-Docker: it pulls the build image (~1GB) and compiles Rust
+      // (crate downloads + an optimized wasm build), which is disk/CPU heavy.
+      // standard-3 = 2 vCPU / 8 GiB / 16 GB disk gives room for the nested image
+      // store + cargo registry + target dir and keeps build times reasonable.
+      // Drop to standard-2 to save cost, or raise to standard-4 for faster builds.
+      "instance_type": "standard-3",
+      "ssh": {
+        "enabled": true,
+      },
+      /* add SSH public key when debugging with wrangler tail */
+      /* "authorized_keys": [
+        {
+          "name": "id_ed25519",
+          "public_key": "ssh-ed25519 PUBLIC_KEY EMAIL_ADDRESS",
+        },
+      ], */
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "Verifier",
+        "name": "VERIFIER",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["Verifier"],
+      "tag": "v1",
+    },
+  ],
+  "upload_source_maps": true,
+}

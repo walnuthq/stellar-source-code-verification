@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import db from "./db/index.js";
 import { type NewVerificationRow, verifications, wasms } from "./db/schema.js";
-import { API_VERIFY_URL, VERIFIER_NAME, VERIFIER_URL } from "./lib/constants.js";
+import { API_VERIFIER_URL, VERIFIER_NAME, VERIFIER_URL } from "./lib/constants.js";
 import type { VerificationStatus } from "./lib/responses.js";
 
 /**
@@ -27,19 +27,19 @@ export function pendingEntry(wasmHash: string): NewVerificationRow {
 }
 
 /**
- * Ask the compute service (apps/api-verify) to run the reproducible build for a
+ * Ask the compute service (apps/api-verifier) to run the reproducible build for a
  * wasm and report whether it reproduced. Rejects when the service is
  * unreachable or errors; resolves with the `verified` boolean otherwise. Can
  * take minutes (the build runs in Docker on the other side).
  */
 async function callVerifyService(wasmHash: string): Promise<boolean> {
-  const res = await fetch(`${API_VERIFY_URL}/verify`, {
+  const res = await fetch(`${API_VERIFIER_URL}/verify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ wasmHash }),
   });
   if (!res.ok) {
-    throw new Error(`api-verify responded ${res.status}`);
+    throw new Error(`api-verifier responded ${res.status}`);
   }
   const { verified } = (await res.json()) as { verified: boolean };
   return verified;

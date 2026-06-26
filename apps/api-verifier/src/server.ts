@@ -27,5 +27,5 @@ app.get("/", (_req, res) => {
 app.use(verifyRouter);
 
 app.listen(Number(PORT), () => {
-  console.log(`api-verify listening on http://localhost:${PORT}`);
+  console.log(`api-verifier listening on http://localhost:${PORT}`);
 });

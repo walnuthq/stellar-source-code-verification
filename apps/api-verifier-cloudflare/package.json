@@ -1,0 +1,23 @@
+{
+  "name": "api-verifier-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "cf:typegen": "wrangler types",
+    "cf:deploy": "wrangler deploy",
+    "cf:dev": "MINIFLARE_CONTAINER_EGRESS_IMAGE=cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c wrangler dev"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "hono": "4.12.27"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "6.0.3",
+    "wrangler": "4.105.0"
+  }
+}

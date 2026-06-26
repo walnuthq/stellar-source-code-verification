@@ -14,9 +14,9 @@ export const DATABASE_URL =
   process.env.DATABASE_URL ??
   "postgres://verifier:verifier@localhost:5434/verifier";
 
-/** Compute service that runs `stellar contract verify` (apps/api-verify). */
-export const API_VERIFY_URL =
-  process.env.API_VERIFY_URL ?? "http://localhost:8080";
+/** Compute service that runs `stellar contract verify` (apps/api-verifier). */
+export const API_VERIFIER_URL =
+  process.env.API_VERIFIER_URL ?? "http://localhost:8080";
 
 /** Soroban RPC endpoint backing the `/` ledger probe. */
 export const STELLAR_RPC_URL =
