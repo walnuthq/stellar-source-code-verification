@@ -24,6 +24,14 @@ if [ "$(id -u)" = 0 ]; then
   mkdir -p /dev/net
   [ -e /dev/net/tun ] || mknod /dev/net/tun c 10 200 2>/dev/null || true
   chmod 0666 /dev/net/tun 2>/dev/null || true
+  # The nested dockerd runs under slirp4netns, whose DNS forwarder (10.0.2.3)
+  # relays to the host resolver — but Cloudflare's default resolver isn't
+  # reachable from the NAT'd namespace, so image pulls fail DNS ("lookup
+  # registry-1.docker.io on 10.0.2.3:53: i/o timeout"). Prepend public resolvers
+  # (reachable via slirp's NAT) while keeping the originals as fallback.
+  orig="$(cat /etc/resolv.conf 2>/dev/null || true)"
+  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n%s\n' "$orig" \
+    > /etc/resolv.conf 2>/dev/null || true
   export HOME=/home/rootless
   exec su-exec rootless:rootless "$0" "$@"
 fi

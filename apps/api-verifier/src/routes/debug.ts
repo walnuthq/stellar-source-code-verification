@@ -43,6 +43,8 @@ router.get("/debug", async (_req, res) => {
     subid,
     cgroup,
     tun,
+    dns,
+    dockerPull,
     dmesg,
   ] = await Promise.all([
     sh("docker info 2>&1; echo '--- DOCKER_HOST='\"$DOCKER_HOST\""),
@@ -70,6 +72,16 @@ router.get("/debug", async (_req, res) => {
         "grep -E 'Cap(Eff|Bnd)' /proc/self/status 2>&1; " +
         "cat /sys/fs/cgroup/devices.allow 2>&1 | head -5",
     ),
+    // DNS reachability from the container's own namespace (the nested daemon's
+    // pulls resolve via slirp4netns 10.0.2.3 -> host resolver).
+    sh(
+      "echo '--- resolv.conf'; cat /etc/resolv.conf 2>&1; " +
+        "echo '--- nslookup default'; nslookup registry-1.docker.io 2>&1 | tail -4; " +
+        "echo '--- nslookup @1.1.1.1'; nslookup registry-1.docker.io 1.1.1.1 2>&1 | tail -4",
+    ),
+    // The exact failing operation: can the nested daemon pull an image? Small
+    // image, bounded so a DNS hang doesn't stall the whole response.
+    sh("timeout 60 docker pull alpine:3 2>&1 | tail -6"),
     sh("dmesg 2>&1 | tail -30"),
   ]);
 
@@ -83,6 +95,8 @@ router.get("/debug", async (_req, res) => {
     subid,
     cgroup,
     tun,
+    dns,
+    dockerPull,
     dmesg,
   });
 });

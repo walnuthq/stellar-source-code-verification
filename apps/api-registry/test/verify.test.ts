@@ -11,7 +11,7 @@ const app = createApp();
 
 // A real, reproducible wasm whose source/build metadata rebuilds to this hash.
 const WASM_HASH =
-  "fd47cee9dec0bd737d10a967f59d27aa2feb8dc6acc8d09419ca961997b213dd";
+  "3d67301ba90bdbdf712a75bcf0061193f481958a5095a29c90465a3529254bcf";
 const PATH = `/wasms/${WASM_HASH}.json`;
 
 const POLL_INTERVAL_MS = 10_000;
