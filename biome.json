@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/drizzle", "!**/stellar-protocol"]
+    "includes": ["**", "!**/drizzle", "!**/stellar-protocol", "!**/stellar-cli"]
   },
   "formatter": {
     "enabled": true,

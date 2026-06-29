@@ -27,6 +27,141 @@ export function createWasmsRouter(
   /**
    * GET /wasms/:wasm_hash.json
    * Returns the verifications this service holds for a single wasm.
+   *
+   * @openapi
+   * /wasms/{wasm_hash}.json:
+   *   get:
+   *     tags: [wasms]
+   *     summary: Look up the verifications a service holds for a wasm
+   *     description: >-
+   *       Returns the verifications a service holds for a single wasm, keyed on
+   *       its content-addressed wasm hash. The path carries a literal `.json`
+   *       suffix. A service that has not yet seen the wasm MAY enqueue a
+   *       verification and answer `202 Accepted`, with the same body shape, so
+   *       the client knows to retry later.
+   *     operationId: getWasmVerification
+   *     parameters:
+   *       - name: wasm_hash
+   *         in: path
+   *         required: true
+   *         description: >-
+   *           Lowercase hex SHA-256 of the wasm to look up (64 hex characters).
+   *           The path appends a `.json` suffix.
+   *         schema:
+   *           type: string
+   *           pattern: "^[0-9a-f]{64}$"
+   *         example: cb2fc3a1b4d5e6f7081928374655647382910abcdef0123456789abcdef01234
+   *       - name: network_passphrase
+   *         in: query
+   *         required: false
+   *         description: >-
+   *           An optional hint naming the network the client cares about, as its
+   *           passphrase. Wasm hashes are network-independent, so this does not
+   *           change the result; a service MAY use it for context and MAY ignore
+   *           it, but MUST NOT reject a request for omitting it.
+   *         schema:
+   *           type: string
+   *         example: "Public Global Stellar Network ; September 2015"
+   *     responses:
+   *       "200":
+   *         description: >-
+   *           The service holds a settled result for this wasm (each verification
+   *           is a final `verified`, `mismatched`, or settled `unverified`).
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: "#/components/schemas/StatusObject"
+   *             examples:
+   *               verified:
+   *                 summary: A verified wasm with a single verifier
+   *                 value:
+   *                   schema_version: "1.0"
+   *                   wasm_hash: cb2fc3a1b4d5e6f7081928374655647382910abcdef0123456789abcdef01234
+   *                   updated_at: "2026-06-04T12:05:00Z"
+   *                   source_code_verifications:
+   *                     - verifier:
+   *                         name: Example Verification Service
+   *                         url: https://verify.example.com
+   *                         logo_url:
+   *                           light: https://verify.example.com/logo.png
+   *                           dark: https://verify.example.com/logo-dark.png
+   *                       status: verified
+   *                       bldimg: docker.io/stellar/stellar-cli@sha256:1f2e3d4c5b6a79887766554433221100ffeeddccbbaa99887766554433221100
+   *                       bldopt: ["--manifest-path=contracts/foo/Cargo.toml", "--optimize"]
+   *                       source_repo: https://github.com/user/my-contract
+   *                       source_rev: abc1234567890abcdef1234567890abcdef12345
+   *                       processed_at: "2026-06-04T12:00:00Z"
+   *                       results_urls:
+   *                         - ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+   *                         - ar://AbCdEf0123456789AbCdEf0123456789AbCdEf0123456789ABC
+   *               mismatched:
+   *                 summary: Two verifiers that disagree
+   *                 value:
+   *                   schema_version: "1.0"
+   *                   wasm_hash: cb2fc3a1b4d5e6f7081928374655647382910abcdef0123456789abcdef01234
+   *                   updated_at: "2026-06-04T13:00:00Z"
+   *                   source_code_verifications:
+   *                     - verifier:
+   *                         name: Verifier A
+   *                         url: https://a.example.com
+   *                       status: verified
+   *                       source_repo: https://github.com/user/my-contract
+   *                       source_rev: abc1234567890abcdef1234567890abcdef12345
+   *                       processed_at: "2026-06-04T12:00:00Z"
+   *                     - verifier:
+   *                         name: Verifier B
+   *                         url: https://b.example.com
+   *                       status: mismatched
+   *                       source_repo: https://github.com/user/my-contract
+   *                       source_rev: abc1234567890abcdef1234567890abcdef12345
+   *                       rebuilt_hash: 999888777666555444333222111000fedcba9876543210fedcba9876543210fe
+   *                       processed_at: "2026-06-04T13:00:00Z"
+   *               unverified:
+   *                 summary: A settled unverified wasm
+   *                 value:
+   *                   schema_version: "1.0"
+   *                   wasm_hash: cb2fc3a1b4d5e6f7081928374655647382910abcdef0123456789abcdef01234
+   *                   updated_at: "2026-06-04T12:00:00Z"
+   *                   source_code_verifications:
+   *                     - verifier:
+   *                         name: Example Verification Service
+   *                       status: unverified
+   *       "202":
+   *         description: >-
+   *           The service has no completed verification yet but has accepted the
+   *           wasm and enqueued one (or one is in progress). The body's
+   *           `source_code_verifications` entries are `unverified` and omit
+   *           `processed_at`. The client should retry after a sensible interval
+   *           (on the order of minutes).
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: "#/components/schemas/StatusObject"
+   *             example:
+   *               schema_version: "1.0"
+   *               wasm_hash: cb2fc3a1b4d5e6f7081928374655647382910abcdef0123456789abcdef01234
+   *               updated_at: "2026-06-04T12:00:00Z"
+   *               source_code_verifications:
+   *                 - verifier:
+   *                     name: Example Verification Service
+   *                   status: unverified
+   *       "400":
+   *         description: >-
+   *           `wasm_hash` is not a valid lowercase hex SHA-256. MAY carry a coded
+   *           error body; clients MUST tolerate a `400` without one.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: "#/components/schemas/Error"
+   *             example:
+   *               schema_version: "1.0"
+   *               error: "400_invalid_wasm_hash"
+   *               message: wasm_hash is not a valid lowercase hex SHA-256.
+   *       "404":
+   *         description: >-
+   *           The service has no verification for this wasm and will not produce
+   *           one (it does not perform on-demand verification, or declines this
+   *           wasm). No response body is defined.
    */
   router.get("/wasms/:id", async (req: Request, res: Response) => {
     const raw = req.params.id;
