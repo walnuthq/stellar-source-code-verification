@@ -12,32 +12,18 @@ const WASM_HASH_RE = /^[0-9a-f]{64}$/;
  * Run `stellar contract verify --wasm-hash <hash> --trust`, which rebuilds the
  * wasm from its recorded SEP-58 build metadata (in Docker) and compares hashes.
  * Resolves with whether the build reproduced (exit 0). Rejects only when the
- * command could not be spawned at all. Can take minutes.
- *
- * DEBUG: combined stdout+stderr is captured and returned so /verify failures can
- * be diagnosed over HTTP (remove with the rest of the debug scaffolding).
+ * command could not be spawned at all. Can take minutes. The command's output is
+ * inherited to the container log for observability.
  */
-function runVerifyCommand(
-  wasmHash: string,
-): Promise<{ verified: boolean; exitCode: number | null; output: string }> {
+function runVerifyCommand(wasmHash: string): Promise<{ verified: boolean }> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       STELLAR_BIN,
       ["contract", "verify", "--wasm-hash", wasmHash, "--trust"],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      { stdio: "inherit" },
     );
-    let output = "";
-    const collect = (chunk: Buffer) => {
-      output += chunk.toString();
-      // Bound memory: keep the last ~64KB.
-      if (output.length > 65536) output = output.slice(-65536);
-    };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", collect);
     child.on("error", reject);
-    child.on("close", (code) =>
-      resolve({ verified: code === 0, exitCode: code, output }),
-    );
+    child.on("close", (code) => resolve({ verified: code === 0 }));
   });
 }
 
@@ -69,8 +55,8 @@ router.post("/verify", async (req, res) => {
   }
 
   try {
-    const { verified, exitCode, output } = await runVerifyCommand(wasmHash);
-    res.json({ verified, exitCode, output });
+    const { verified } = await runVerifyCommand(wasmHash);
+    res.json({ verified });
   } catch (err) {
     console.error(`Could not run verification for ${wasmHash}:`, err);
     const message = err instanceof Error ? err.message : "Verification failed";
